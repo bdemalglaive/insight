@@ -14,6 +14,7 @@ namespace SensioLabs\Insight\Sdk\Model;
 use JMS\Serializer\Annotation\SerializedName;
 use JMS\Serializer\Annotation\Type;
 use JMS\Serializer\Annotation\XmlList;
+use JMS\Serializer\Annotation\XmlAttributeMap;
 
 class Analysis
 {
@@ -109,6 +110,12 @@ class Analysis
 
     /** @Type("SensioLabs\Insight\Sdk\Model\Violations") */
     private $violations;
+
+    /**
+     * @Type("SensioLabs\Insight\Sdk\Model\PreviousAnalysesReferences")
+     * @SerializedName("previous-analyses-references")
+     */
+    private $previousAnalysesReferences;
 
     /**
      * @return Link[]
@@ -260,5 +267,13 @@ class Analysis
     public function getViolations()
     {
         return $this->violations;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getPreviousAnalysesReferences()
+    {
+        return $this->previousAnalysesReferences;
     }
 }

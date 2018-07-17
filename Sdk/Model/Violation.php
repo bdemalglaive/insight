@@ -13,9 +13,24 @@ namespace SensioLabs\Insight\Sdk\Model;
 
 use JMS\Serializer\Annotation\Type;
 use JMS\Serializer\Annotation\XmlAttribute;
+use JMS\Serializer\Annotation\Exclude;
 
 class Violation
 {
+    CONST SEVERITY_MINOR = 'minor';
+    CONST SEVERITY_MAJOR = "major";
+    CONST SEVERITY_CRITICAL = 'critical';
+
+    /**
+     * @Exclude
+     * @var array
+     */
+    static public $severitys = [
+        self::SEVERITY_MINOR => 1,
+        self::SEVERITY_MAJOR => 2,
+        self::SEVERITY_CRITICAL => 3
+    ];
+
     /** @Type("string") */
     private $title;
 
@@ -100,5 +115,21 @@ class Violation
     public function isIgnored()
     {
         return $this->ignored;
+    }
+
+    /**
+     * @return string
+     */
+    public function getMd5()
+    {
+        return md5(implode('-',[
+                $this->title,
+                $this->message,
+                $this->resource,
+                $this->line,
+                $this->severity,
+                $this->category,
+                $this->ignored
+            ]));
     }
 }
