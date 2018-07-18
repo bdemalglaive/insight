@@ -17,8 +17,9 @@ use JMS\Serializer\Annotation\Exclude;
 
 class Violation
 {
-    CONST SEVERITY_MINOR = 'minor';
-    CONST SEVERITY_MAJOR = "major";
+    CONST SEVERITY_INFO     = 'info';
+    CONST SEVERITY_MINOR    = 'minor';
+    CONST SEVERITY_MAJOR    = "major";
     CONST SEVERITY_CRITICAL = 'critical';
 
     /**
@@ -26,6 +27,7 @@ class Violation
      * @var array
      */
     static public $severitys = [
+        self::SEVERITY_INFO => 0,
         self::SEVERITY_MINOR => 1,
         self::SEVERITY_MAJOR => 2,
         self::SEVERITY_CRITICAL => 3
