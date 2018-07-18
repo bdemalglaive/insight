@@ -39,6 +39,16 @@ class DiffCommand extends Command implements NeedConfigurationInterface
      */
     protected $lastAnalysis;
 
+    /**
+     * @var OutputInterface
+     */
+    protected $output;
+
+    /**
+     * @var String
+     */
+    protected $format;
+
     protected function configure()
     {
         $this
@@ -53,14 +63,30 @@ class DiffCommand extends Command implements NeedConfigurationInterface
         ;
     }
 
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int|void
+     */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->api = $this->getApplication()->getApi();
-        $this->projectUuid = $input->getArgument('project-uuid');
+        $this->projectUuid  = $input->getArgument('project-uuid');
+        $this->format       = $input->getOption('format');
+        $this->output       = $output;
+        $this->api          = $this->getApplication()->getApi();
         $this->lastAnalysis = $this->api->getProject( $this->projectUuid)->getLastAnalysis();
 
         $analysisHead = $this->getAnalysisByReference($input->getOption('reference-head'));
+        if ($analysisHead instanceof Analysis === false) {
+            $this->output->writeln('<error>There are no analyses for '.$input->getOption('reference-head').' reference</error>');
+            return 1;
+        }
+
         $analysisBase = $this->getAnalysisByReference($input->getOption('reference-base'));
+        if ($analysisBase instanceof Analysis === false) {
+            $this->output->writeln('<error>There are no analyses for '.$input->getOption('reference-base').' reference</error>');
+            return 1;
+        }
 
         $ref = [];
         foreach ($analysisBase->getViolations() as $violation) {
@@ -73,17 +99,12 @@ class DiffCommand extends Command implements NeedConfigurationInterface
         $analysisHead->getViolations()->sort();
 
 
-        if (!$analysisHead) {
-            $output->writeln('<error>There are no analyses</error>');
-            return 1;
-        }
-
         $helper = new DescriptorHelper( $this->api->getSerializer());
-        $helper->describe($output, $analysisHead, $input->getOption('format'), $input->getOption('show-ignored-violations'));
+        $helper->describe($this->output, $analysisHead, $this->format, $input->getOption('show-ignored-violations'));
 
-        if ('txt' === $input->getOption('format') && OutputInterface::VERBOSITY_VERBOSE > $output->getVerbosity()) {
-            $output->writeln('');
-            $output->writeln('Re-run this command with <comment>-v</comment> option to get the full report');
+        if ('txt' === $this->format && OutputInterface::VERBOSITY_VERBOSE > $this->output->getVerbosity()) {
+            $this->output->writeln('');
+            $this->output->writeln('Re-run this command with <comment>-v</comment> option to get the full report');
         }
 
         if (!$expr = $input->getOption('fail-condition')) {
@@ -104,67 +125,55 @@ class DiffCommand extends Command implements NeedConfigurationInterface
 
         $analysisNumber = $data->findAnalysisNumberByReference($reference);
         if ($analysisNumber === null) {
-            // TODO : Lancer une analyse
+            return $this->startAnalyse($reference);
         }
         return $this->api->getAnalysis( $this->projectUuid,$analysisNumber);
     }
 
-//    protected function execute(InputInterface $input, OutputInterface $output)
-//    {
-//        $projectUuid = $input->getArgument('project-uuid');
-//        $api = $this->getApplication()->getApi();
-//        $analysis = $api->analyze($projectUuid, $input->getOption('reference'));
-//
-//        $chars = array('-', '\\', '|', '/');
-//        $noAnsiStatus = 'Analysis queued';
-//        $output->getErrorOutput()->writeln($noAnsiStatus);
-//
-//        $position = 0;
-//
-//        while (true) {
-//            // we don't check the status too often
-//            if (0 === $position % 2) {
-//                $analysis = $api->getAnalysisStatus($projectUuid, $analysis->getNumber());
-//            }
-//
-//            if ('txt' === $input->getOption('format')) {
-//                if (!$output->isDecorated()) {
-//                    if ($noAnsiStatus !== $analysis->getStatusMessage()) {
-//                        $output->writeln($noAnsiStatus = $analysis->getStatusMessage());
-//                    }
-//                } else {
-//                    $output->write(sprintf("%s %-80s\r", $chars[$position % 4], $analysis->getStatusMessage()));
-//                }
-//            }
-//
-//            if ($analysis->isFinished()) {
-//                break;
-//            }
-//
-//            usleep(200000);
-//
-//            ++$position;
-//        }
-//
-//        $analysis = $api->getAnalysis($projectUuid, $analysis->getNumber());
-//        if ($analysis->isFailed()) {
-//            $output->writeln(sprintf('There was an error: "%s"', $analysis->getFailureMessage()));
-//
-//            return 1;
-//        }
-//
-//        $helper = new DescriptorHelper($api->getSerializer());
-//        $helper->describe($output, $analysis, $input->getOption('format'), $input->getOption('show-ignored-violations'));
-//
-//        if ('txt' === $input->getOption('format') && OutputInterface::VERBOSITY_VERBOSE > $output->getVerbosity()) {
-//            $output->writeln('');
-//            $output->writeln(sprintf('Run <comment>%s %s %s -v</comment> to get the full report', $_SERVER['PHP_SELF'], 'analysis', $projectUuid));
-//        }
-//
-//        if (!$expr = $input->getOption('fail-condition')) {
-//            return;
-//        }
-//
-//        return $this->getHelperSet()->get('fail_condition')->evaluate($analysis, $expr);
-//    }
+    /**
+     * @param $reference
+     * @return bool|Analysis
+     */
+    protected function startAnalyse($reference)
+    {
+        $analysis =  $this->api->analyze($this->projectUuid, $reference);
+
+        $chars = array('-', '\\', '|', '/');
+        $noAnsiStatus = 'Analysis queued';
+        $this->output->getErrorOutput()->writeln($noAnsiStatus);
+
+        $position = 0;
+
+        while (true) {
+            // we don't check the status too often
+            if (0 === $position % 2) {
+                $analysis =  $this->api->getAnalysisStatus($this->projectUuid, $analysis->getNumber());
+            }
+
+            if ('txt' === $this->format) {
+                if (!$this->output->isDecorated()) {
+                    if ($noAnsiStatus !== $analysis->getStatusMessage()) {
+                        $this->output->writeln($noAnsiStatus = $analysis->getStatusMessage());
+                    }
+                } else {
+                    $this->output->write(sprintf("%s %-80s\r", $chars[$position % 4], $analysis->getStatusMessage()));
+                }
+            }
+
+            if ($analysis->isFinished()) {
+                break;
+            }
+
+            usleep(200000);
+
+            ++$position;
+        }
+
+        $analysis =  $this->api->getAnalysis($this->projectUuid, $analysis->getNumber());
+        if ($analysis->isFailed()) {
+            $this->output->writeln(sprintf('There was an error: "%s"', $analysis->getFailureMessage()));
+            return false;
+        }
+        return $analysis;
+    }
 }
